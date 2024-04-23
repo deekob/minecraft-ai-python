@@ -1,21 +1,18 @@
-import boto3
-import json
+# pip install javascript
+# conda install nodejs 
+
 from javascript import require, On
-from context.simple import prompt
-from helper.direction import *
+import time
 
 mineflayer = require('mineflayer')
-pathfinder = require('mineflayer-pathfinder')
 
 bot = mineflayer.createBot({
   'host': 'localhost',
-  'port': [PORT_NUMBER],
+  'port': 54858,
   'username':'Claude',
   'verbose': True,
   'checkTimeoutInterval': 60 * 10000,
 })
-
-bot.loadPlugin(pathfinder.pathfinder)
 
 mcData = require('minecraft-data')(bot.version)
 
@@ -28,30 +25,12 @@ def spawn(*args):
 @On(bot, "chat")
 def handle(this, player_name, message, *args):
     if player_name == bot.username:
+        # This is a chat from the bot itself, so do nothing...
         return
     else:
-        bedrock = boto3.client(service_name="bedrock-runtime")
-        query = "\n\nHuman: {}\n// {} \n\nAssistant:".format(prompt, message)
-        print(query)
-        body = json.dumps(
-            {
-                "prompt": query,
-                "max_tokens_to_sample": 100,
-                "anthropic_version": "bedrock-2023-05-31"
-            }
-        )
-        response = bedrock.invoke_model(body=body, modelId="anthropic.claude-v2:1")
-        response_body = json.loads(response.get("body").read())
-        response = response_body.get("completion")
-        print(response)
-        try:
-            # WARNING: this is a very dangerous way to execute code! Do you trust AI?
-            # Note: the code is executed in the context of the bot entity
-
-            bot.chat("Claude generated the following line of code: {}".format(response))
-            eval("{}".format(response))
-            print(response)
-        except Exception as error:
-            print("error: {}".format(error))
-            print("{}".format(response))
-            bot.chat("ERROR I could not execute that")
+        # Someone said something...
+        bot.setControlState('jump', True)
+        bot.chat("Hello, {}!".format(player_name))
+        bot.chat("You said: {}".format(message))
+        time.sleep(1)
+        bot.setControlState('jump', False)
