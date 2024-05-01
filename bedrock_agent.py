@@ -26,6 +26,25 @@ class FunctionHandler:
     def action_dig(self, parameters):
         self.logger.info("Digging")
         self.logger.info(parameters)
+
+        # Look in inventory
+        inventory_items = self.bot.inventory.items()
+
+        # # equip with pix axe (of any sort)
+        # loop through inventory and find the item with name that contains 'pickaxe'
+        for item in inventory_items:
+            if 'pickaxe' in item.name:
+                self.bot.equip(item, 'hand')
+                break
+
+        #dig a 2 by 2 by 2 hole:
+        for x in range(-int(parameters['width']),0):
+            for z in range(-int(parameters['width']),0):
+                for y in range(-int(parameters['depth']),0):
+                    print(f"digging {x}, {y}, {z}")
+                    block_to_dig = self.bot.blockAt(self.bot.entity.position.offset(x, y, z))
+                    self.bot.dig(block_to_dig)
+
         return {"message": "Done"}, "REPROMPT"
 
     def action_jump(self, parameters):
@@ -77,21 +96,14 @@ class FunctionHandler:
     
     def action_get_distance_between_to_entities(self, parameters):
         self.logger.info("Getting the distance between to entities.")
-        self.logger.info(parameters)
-
-        # This is a bit of a hack, but it works.
-        # If the json string contains single quotes replace with double quotes:
-        if "'" in parameters['location_1']:
-            parameters['location_1'] = parameters['location_1'].replace("'", '"')
-        if "'" in parameters['location_2']:
-            parameters['location_2'] = parameters['location_2'].replace("'", '"')        
+        self.logger.info(parameters)     
 
         # get location from json string:
-        location_1 = json.loads(parameters['location_1']) # {'x':x,'y':y,'z':z}
-        location_2 = json.loads(parameters['location_2']) # {'x':x,'y':y,'z':z}
+        location_1 = json.loads(parameters['location_1']) # [x,y,z]
+        location_2 = json.loads(parameters['location_2']) # [x,y,z]
 
         # calculate the euclidean distance between the two entities:
-        result = ((location_2['x'] - location_1['x']) ** 2 + (location_2['y'] - location_1['y']) ** 2 + (location_2['z'] - location_1['z']) ** 2) ** 0.5
+        result = ((location_2[0] - location_1[0]) ** 2 + (location_2[1] - location_1[1]) ** 2 + (location_2[2] - location_1[2]) ** 2) ** 0.5
         
         self.logger.info(result)
         return {"distance": result}, "REPROMPT"

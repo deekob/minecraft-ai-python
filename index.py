@@ -25,7 +25,7 @@ bot.loadPlugin(pathfinder.pathfinder)
 mcData = require('minecraft-data')(bot.version)
 
 bedrockAgent = BedrockBot(bot, pathfinder)
-bedrockAgent.agentAliasId = 'NBTUEMVHC5'
+bedrockAgent.agentAliasId = 'YLNUCCP5XS'
 bedrockAgent.agentId = 'DEHCT5KPAE'
 bedrockAgent.session_id = session_uuid_string
 
