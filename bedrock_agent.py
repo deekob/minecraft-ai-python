@@ -98,15 +98,22 @@ class FunctionHandler:
         self.logger.info("Getting the distance between to entities.")
         self.logger.info(parameters)     
 
-        # get location from json string:
-        location_1 = json.loads(parameters['location_1']) # [x,y,z]
-        location_2 = json.loads(parameters['location_2']) # [x,y,z]
+
+        try:
+            # get location from json string:
+            location_1 = json.loads(parameters['location_1']) # [x,y,z]
+            location_2 = json.loads(parameters['location_2']) # [x,y,z]
+        except Exception as e:
+            self.logger.exception(e)
+            return {"error": "Invalid JSON list"}, "REPROMPT"
 
         # calculate the euclidean distance between the two entities:
         result = ((location_2[0] - location_1[0]) ** 2 + (location_2[1] - location_1[1]) ** 2 + (location_2[2] - location_1[2]) ** 2) ** 0.5
         
         self.logger.info(result)
         return {"distance": result}, "REPROMPT"
+    
+
 
     def call_function(self, function_name, parameters):
         """Dynamically calls functions based on function_name."""
