@@ -74,6 +74,27 @@ class FunctionHandler:
         range_goal = 1
         self.bot.pathfinder.setGoal(self.pathfinder.goals.GoalNear(x, y, z, range_goal))
         return {"message": "En route"}, "REPROMPT"
+    
+    def action_get_distance_between_to_entities(self, parameters):
+        self.logger.info("Getting the distance between to entities.")
+        self.logger.info(parameters)
+
+        # This is a bit of a hack, but it works.
+        # If the json string contains single quotes replace with double quotes:
+        if "'" in parameters['location_1']:
+            parameters['location_1'] = parameters['location_1'].replace("'", '"')
+        if "'" in parameters['location_2']:
+            parameters['location_2'] = parameters['location_2'].replace("'", '"')        
+
+        # get location from json string:
+        location_1 = json.loads(parameters['location_1']) # {'x':x,'y':y,'z':z}
+        location_2 = json.loads(parameters['location_2']) # {'x':x,'y':y,'z':z}
+
+        # calculate the euclidean distance between the two entities:
+        result = ((location_2['x'] - location_1['x']) ** 2 + (location_2['y'] - location_1['y']) ** 2 + (location_2['z'] - location_1['z']) ** 2) ** 0.5
+        
+        self.logger.info(result)
+        return {"distance": result}, "REPROMPT"
 
     def call_function(self, function_name, parameters):
         """Dynamically calls functions based on function_name."""
