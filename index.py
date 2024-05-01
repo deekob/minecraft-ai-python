@@ -11,19 +11,21 @@ import time
 session_uuid_string = uuid.uuid4().hex
 
 mineflayer = require('mineflayer')
+pathfinder = require('mineflayer-pathfinder')
 
 bot = mineflayer.createBot({
   'host': 'localhost',
-  'port': 54858,
+  'port': 58871,
   'username':'Claude',
   'verbose': True,
   'checkTimeoutInterval': 60 * 10000,
 })
 
+bot.loadPlugin(pathfinder.pathfinder)
 mcData = require('minecraft-data')(bot.version)
 
-bedrockAgent = BedrockBot(bot)
-bedrockAgent.agentAliasId = 'LLA0IYYEF0'
+bedrockAgent = BedrockBot(bot, pathfinder)
+bedrockAgent.agentAliasId = 'T4DIS6A7CZ'
 bedrockAgent.agentId = 'DEHCT5KPAE'
 bedrockAgent.session_id = session_uuid_string
 

@@ -17,9 +17,10 @@ logging.basicConfig(
 
 class FunctionHandler:
 
-    def __init__(self, playerBot):
+    def __init__(self, playerBot, pathfinder):
         self.logger = logging.getLogger(__name__)
         self.bot = playerBot
+        self.pathfinder = pathfinder
         
     """Handles specific actions that can be called dynamically."""
     def action_dig(self, parameters):
@@ -50,22 +51,53 @@ class FunctionHandler:
         self.logger.info(result)
         return {"time": result}, "REPROMPT"
 
+    def action_get_player_location(self, parameters):
+        # requires the player_name to be set
+        self.logger.info("Getting the location.")
+        self.logger.info(parameters)
+        # get location in a string format:
+        player_name = parameters['player_name']
+        player = self.bot.players[player_name]
+        entity = player.entity
+        pos = entity.position
+        result = f"x:{pos.x}, y:{pos.y}, z:{pos.z}"
+        self.logger.info(result)
+        return {"location": result}, "REPROMPT"
+    
+    def action_move_to_location(self, parameters):
+        self.logger.info("Moving to location.")
+        self.logger.info(parameters)
+        # get location from string into float:
+        x = float(parameters['location_x'])
+        y = float(parameters['location_y'])
+        z = float(parameters['location_z'])
+        range_goal = 1
+        self.bot.pathfinder.setGoal(self.pathfinder.goals.GoalNear(x, y, z, range_goal))
+        return {"message": "En route"}, "REPROMPT"
+
     def call_function(self, function_name, parameters):
         """Dynamically calls functions based on function_name."""
+
+        param_dict = {}
+        for entry in parameters:
+            key = entry.get("name")
+            value = entry.get("value")
+            param_dict[key] = value
+
         func = getattr(self, function_name, None)
         if func is None:
             self.logger.exception("Function not found.")
             return {"error": "Function not found"}, "FAILURE"
-        return func(parameters)
+        return func(param_dict)
 
 class BedrockBot:
-    def __init__(self, playerBot):
+    def __init__(self, playerBot, pathfinder):
         self.logger = logging.getLogger(__name__)
         self.bedrock_agent_runtime_client = boto3.client('bedrock-agent-runtime', region_name='us-west-2')
         self.agentAliasId = 'WP6MJQ3RNG'
         self.agentId = 'DEHCT5KPAE'
         self.playerBot = playerBot
-        self.function_handler = FunctionHandler(playerBot)
+        self.function_handler = FunctionHandler(playerBot, pathfinder)
         self.session_id = None
 
     async def chat_with_agent(self, prompt):
