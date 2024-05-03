@@ -109,7 +109,7 @@ class MinecraftStack (Stack):
             desired_count=1,
             public_load_balancer=True,
             listener_port=25565,
-            assign_public_ip=True,
+            assign_public_ip=False,
             health_check_grace_period=Duration.minutes(5),
             security_groups=[minecraft_security_group]  # Add this line to include your security group
         )
