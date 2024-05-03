@@ -1,13 +1,10 @@
-from aws_cdk import (
-    Stack,
-    aws_ec2 as ec2,
-    aws_ecs as ecs,
-    aws_ecs_patterns as ecs_patterns,  CfnOutput, Stack,
-    Duration,
-    aws_secretsmanager as secretsmanager
-)
-
+from aws_cdk import Stack, Duration, CfnOutput
+import aws_cdk.aws_ec2 as ec2
+import aws_cdk.aws_ecs as ecs
+import aws_cdk.aws_ecs_patterns as ecs_patterns
+import aws_cdk.aws_secretsmanager as secretsmanager
 from constructs import Construct
+from aws_cdk import aws_iam as iam
 
 #create a python CDK stack that extends cdk.Stack
 class MinecraftStack (Stack):
@@ -91,13 +88,15 @@ class MinecraftStack (Stack):
         )
       
         mount_points=[
-                ecs.MountPoint(
-                    read_only = False,
-                    container_path="/data",
-                    source_volume="minecraft-data"
-                )
-            ]
+            ecs.MountPoint(
+                read_only = False,
+                container_path="/data",
+                source_volume="minecraft-data"
+            )
+        ]
+        
         container.mount_point=mount_points
+
         task_definition.add_volume(
             name="minecraft-data"
         )
@@ -114,6 +113,111 @@ class MinecraftStack (Stack):
             security_groups=[minecraft_security_group]  # Add this line to include your security group
         )
 
+# ######################################################
+# Create an IAM role for the Node.js container
+
+        nodejs_task_role = iam.Role(
+            self, "NodeJsTaskRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+            description="IAM role for Node.js Fargate task"
+        )
+
+        # Define the custom policy document allowing Bedrock runtime access
+        bedrock_policy_document = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    actions=[
+                        "bedrock:Invoke*"
+                    ],
+                    resources=["*"],  # Adjust the resource ARN as needed
+                    effect=iam.Effect.ALLOW
+                )
+            ]
+        )
+
+        # Create an IAM policy using the custom policy document
+        bedrock_policy = iam.Policy(
+            self, "BedrockPolicy",
+            policy_name="BedrockRuntimeAccessPolicy",
+            document=bedrock_policy_document
+        )
+
+        # Attach the custom policy to the IAM role
+        nodejs_task_role.attach_inline_policy(bedrock_policy)
+
+        # Update the Node.js task definition to use the IAM role
+        nodejs_task_definition = ecs.FargateTaskDefinition(
+            self, "NodeJsTaskDefinition",
+            cpu=256,
+            memory_limit_mib=512,
+            task_role=nodejs_task_role,  # Set the task role for the task definition
+            # compatibility=ecs.Compatibility.EC2
+        )
+
+        health_check = ecs.HealthCheck(
+            interval=Duration.minutes(1),
+            timeout=Duration.seconds(30),
+            retries=3,
+            start_period=Duration.seconds(300),  # 5 minutes
+            command=["CMD-SHELL", "echo 'foo' || exit 1"]
+        )
+
+        nodejs_container = nodejs_task_definition.add_container(
+            "nodejs-container",
+            image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
+            logging=ecs.LogDriver.aws_logs(stream_prefix="amazonlinux"),
+            health_check=health_check,
+            command=[
+                "sh",
+                "-c",
+                "echo 'Installing Node.js and Python packages...'",
+                "yum install -y nodejs python3",
+                "pip3 install --upgrade pip",
+                "echo 'Go!!' && tail -f /dev/null"
+            ],
+        )
+
+        nodejs_container.add_port_mappings(
+            ecs.PortMapping(container_port=3000, host_port=3000, protocol=ecs.Protocol.TCP)
+        )
+
+        nodejs_security_group = ec2.SecurityGroup(
+            self,
+            "NodeJsSecurityGroup",
+            vpc=minecraft_vpc,
+            description="Security group for Node.js service",
+            allow_all_outbound=True
+        )
+
+        # Create the Node.js service without a load balancer and with the new security group
+        nodejs_service = ecs.FargateService(
+            self, "NodeJsService",
+            cluster=cluster,
+            task_definition=nodejs_task_definition,
+            desired_count=1,
+            security_groups=[nodejs_security_group],  # Use the dedicated security group
+            assign_public_ip=False,
+            enable_execute_command=True
+        )
+
+
+# #######################################################
+
+        # # Output the AWS ECS execute-command command for the Node.js container
+        # nodejs_execute_command = f"aws ecs execute-command \\
+        #     --region {core.Aws.REGION} \\
+        #     --cluster {cluster.cluster_name} \\
+        #     --task <task-id> \\
+        #     --container {nodejs_container.container_name} \\
+        #     --command \"/bin/sh\" \\
+        #     --interactive"
+
+        # CfnOutput(
+        #     self,
+        #     "NodeJs Execute Command",
+        #     value=nodejs_execute_command,
+        #     description="Execute command for Node.js container"
+        # )
 
         CfnOutput(
             self,
