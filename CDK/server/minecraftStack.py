@@ -2,7 +2,9 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
     aws_ecs as ecs,
-    aws_ecs_patterns as ecs_patterns,  CfnOutput, Stack
+    aws_ecs_patterns as ecs_patterns,  CfnOutput, Stack,
+    Duration,
+    aws_secretsmanager as secretsmanager
 )
 
 from constructs import Construct
@@ -20,6 +22,22 @@ class MinecraftStack (Stack):
             nat_gateways=1
         )
 
+        # Security Group
+        minecraft_security_group = ec2.SecurityGroup(
+            self,
+            "MinecraftServerSecurityGroup",
+            vpc=minecraft_vpc,
+            description="Security group for Minecraft server",
+            allow_all_outbound=True
+        )
+
+        # Add security group rules
+        minecraft_security_group.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(25565),
+            description="Allow inbound TCP traffic on port 25565"
+        )
+
         # ECS Cluster
         cluster = ecs.Cluster(
             self,
@@ -34,6 +52,8 @@ class MinecraftStack (Stack):
             memory_limit_mib=8192,
         )
         
+        rcon_secret = secretsmanager.Secret.from_secret_name_v2(self, "RconPassword", "minecraft/rcon-password")
+
         container = task_definition.add_container(
             "minecraft-server",
             image=ecs.ContainerImage.from_registry("itzg/minecraft-server"),
@@ -43,12 +63,30 @@ class MinecraftStack (Stack):
                     container_port=25565,
                     host_port=25565,
                     protocol=ecs.Protocol.TCP
+                ),
+                ecs.PortMapping(
+                    container_port=25575,
+                    host_port=25575,
+                    protocol=ecs.Protocol.TCP
                 )
             ],
-            environment = {
+            environment={
                 "EULA": "TRUE",
-                "VERSION":"1.19.3"
-            })
+                "VERSION": "1.19.3",
+                "SERVER_PORT": "25565",
+                "RCON_PORT": "25575",
+            },
+            secrets={
+                "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
+            },
+            health_check=ecs.HealthCheck(
+                command=["CMD-SHELL", "netstat -an | grep 25565 > /dev/null || exit 1"],
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+                retries=3,
+                start_period=Duration.seconds(300)  # 5 minutes
+            )
+        )
       
         mount_points=[
                 ecs.MountPoint(
@@ -62,15 +100,18 @@ class MinecraftStack (Stack):
             name="minecraft-data"
         )
 
-        minecraft_service = ecs_patterns.ApplicationLoadBalancedFargateService(
+        minecraft_service = ecs_patterns.NetworkLoadBalancedFargateService(
             self, "MinecraftServerService",
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
             public_load_balancer=True,
             listener_port=25565,
-            assign_public_ip=True
+            assign_public_ip=True,
+            health_check_grace_period=Duration.minutes(5),
+            security_groups=[minecraft_security_group]  # Add this line to include your security group
         )
+
 
         CfnOutput(
             self,
