@@ -49,14 +49,14 @@ class MinecraftStack (Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, "MinecraftServerTaskDefinition",
             cpu=4096,
-            memory_limit_mib=8192,
+            memory_limit_mib=16384,
         )
         
         rcon_secret = secretsmanager.Secret.from_secret_name_v2(self, "RconPassword", "minecraft/rcon-password")
 
         container = task_definition.add_container(
             "minecraft-server",
-            image=ecs.ContainerImage.from_registry("itzg/minecraft-server"),
+            image=ecs.ContainerImage.from_registry("itzg/minecraft-server:latest"),
             logging=ecs.LogDriver.aws_logs(stream_prefix="minecraft"),
             port_mappings=[
                 ecs.PortMapping(
@@ -72,9 +72,11 @@ class MinecraftStack (Stack):
             ],
             environment={
                 "EULA": "TRUE",
-                "VERSION": "1.19.3",
+                "VERSION": "1.20.1",
                 "SERVER_PORT": "25565",
                 "RCON_PORT": "25575",
+                "MODE": "creative",
+                "DIFFICULTY": "peaceful"
             },
             secrets={
                 "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
@@ -116,6 +118,6 @@ class MinecraftStack (Stack):
         CfnOutput(
             self,
             "MineCraft Service",
-            value=f"http://{minecraft_service.load_balancer.load_balancer_dns_name}",
+            value=f"{minecraft_service.load_balancer.load_balancer_dns_name}:25565",
             description="Access minecraft from your client"
         )
