@@ -73,7 +73,8 @@ class MinecraftStack (Stack):
                 "SERVER_PORT": "25565",
                 "RCON_PORT": "25575",
                 "MODE": "creative",
-                "DIFFICULTY": "peaceful"
+                "DIFFICULTY": "peaceful",
+                "ONLINE_MODE": "FALSE",
             },
             secrets={
                 "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
@@ -172,7 +173,11 @@ class MinecraftStack (Stack):
                 "-c",
                 "echo 'Installing Node.js and Python packages...'",
                 "yum install -y nodejs python3",
-                "pip3 install --upgrade pip",
+                "python3 -m ensurepip --upgrade",
+                "yum install git",
+                "pip3 install boto3 javascript",
+                "git clone https://github.com/deekob/minecraft-ai-python.git",
+                "echo 'More things here",
                 "echo 'Go!!' && tail -f /dev/null"
             ],
         )
