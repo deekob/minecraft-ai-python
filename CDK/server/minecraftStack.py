@@ -171,10 +171,12 @@ class MinecraftStack (Stack):
             command=[
                 "sh",
                 "-c",
+                # "echo 'foo' && tail -f /dev/null"
                 "echo 'Installing Node.js and Python packages...'",
                 "yum install -y nodejs python3 git",
                 "python3 -m ensurepip --upgrade",
                 "git clone https://github.com/deekob/minecraft-ai-python.git",
+                "cd minecraft-ai-python",
                 "pip3 install -r requirements.txt",
                 f"export MINECRAFT_NLB_DNS_NAME={minecraft_service.load_balancer.load_balancer_dns_name}", 
                 "python3 ./index.py" # && tail -f /dev/null"
@@ -206,6 +208,21 @@ class MinecraftStack (Stack):
 
 
 # #######################################################
+
+        server_connection_link = f"""aws ecs execute-command \
+    --cluster {cluster.cluster_name} \
+    --task {nodejs_service.task_definition.task_definition_arn}/XXXXXXXXXXX \
+    --container nodejs-container \
+    --interactive \
+    --command "/bin/sh"
+"""
+
+        CfnOutput(
+            self,
+            "Server Connection",
+            value=f"{server_connection_link}",
+            description="Connect to the node container"
+        )
 
         CfnOutput(
             self,
