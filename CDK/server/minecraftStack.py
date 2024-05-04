@@ -11,6 +11,9 @@ class MinecraftStack (Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+# ######################################################
+# Create VPC and networking
+
         # VPC
         minecraft_vpc = ec2.Vpc(
             self, 
@@ -35,12 +38,18 @@ class MinecraftStack (Stack):
             description="Allow inbound TCP traffic on port 25565"
         )
 
+# ######################################################
+# Create ECS Cluster
+
         # ECS Cluster
         cluster = ecs.Cluster(
             self,
             "MinecraftServerCluster",
             vpc=minecraft_vpc
         )
+
+# ######################################################
+# Create Minecraft Task
 
         # ECS Task Definition
         task_definition = ecs.FargateTaskDefinition(
@@ -124,6 +133,7 @@ class MinecraftStack (Stack):
         )
 
         # Define the custom policy document allowing Bedrock runtime access
+        ecr_repository_arn = "arn:aws:ecr:us-west-2:590183852924:repository/minecraft-bot"
         bedrock_policy_document = iam.PolicyDocument(
             statements=[
                 iam.PolicyStatement(
@@ -146,46 +156,80 @@ class MinecraftStack (Stack):
         # Attach the custom policy to the IAM role
         nodejs_task_role.attach_inline_policy(bedrock_policy)
 
+# ######################################################
+# Create Amazon ECS task execution IAM role
+
+        nodejs_task_execution_role = iam.Role(
+            self, "NodeJsTaskExecutionRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+            description="IAM role for Node.js Fargate task execution"
+        )
+
+        # Define the custom policy document allowing Bedrock runtime access
+        execution_policy_document = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    actions=[
+                        "ecr:GetAuthorizationToken",
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:BatchGetImage",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                    ],
+                    resources=["*"],
+                    effect=iam.Effect.ALLOW
+                )
+            ]
+        )
+
+        # Create an IAM policy using the custom policy document
+        execution_policy = iam.Policy(
+            self, "ExecutionPolicy",
+            policy_name="ECSExecutionRuntimeAccessPolicy",
+            document=execution_policy_document
+        )
+
+        # Attach the custom policy to the IAM role
+        nodejs_task_execution_role.attach_inline_policy(execution_policy)
+
+# ######################################################
+# Create Task...
+
         # Update the Node.js task definition to use the IAM role
         nodejs_task_definition = ecs.FargateTaskDefinition(
             self, "NodeJsTaskDefinition",
             cpu=256,
             memory_limit_mib=512,
-            task_role=nodejs_task_role,  # Set the task role for the task definition
-            # compatibility=ecs.Compatibility.EC2
+            task_role=nodejs_task_role,
+            execution_role=execution_policy
         )
 
         health_check = ecs.HealthCheck(
             interval=Duration.minutes(1),
             timeout=Duration.seconds(30),
             retries=3,
-            start_period=Duration.seconds(300),  # 5 minutes
-            command=["CMD-SHELL", "echo 'foo' || exit 1"]
+            start_period=Duration.minutes(1),
+            command=["CMD-SHELL", "echo 'foo' || exit 0"]
         )
 
         nodejs_container = nodejs_task_definition.add_container(
             "nodejs-container",
-            image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
-            logging=ecs.LogDriver.aws_logs(stream_prefix="amazonlinux"),
+            # image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
+            image=ecs.ContainerImage.from_registry("590183852924.dkr.ecr.us-west-2.amazonaws.com/minecraft-bot:0.1.2-1"),
+            logging=ecs.LogDriver.aws_logs(stream_prefix="nodejs_container"),
             health_check=health_check,
-            command=[
-                "sh",
-                "-c",
-                # "echo 'foo' && tail -f /dev/null"
-                "echo 'Installing Node.js and Python packages...'",
-                "yum install -y nodejs python3 git",
-                "python3 -m ensurepip --upgrade",
-                "git clone https://github.com/deekob/minecraft-ai-python.git",
-                "cd minecraft-ai-python",
-                "pip3 install -r requirements.txt",
-                f"export MINECRAFT_NLB_DNS_NAME={minecraft_service.load_balancer.load_balancer_dns_name}", 
-                "python3 ./index.py" # && tail -f /dev/null"
-            ],
+            environment={
+                "MINECRAFT_NLB_DNS_NAME": f"{minecraft_service.load_balancer.load_balancer_dns_name}"
+            }
         )
 
         nodejs_container.add_port_mappings(
             ecs.PortMapping(container_port=3000, host_port=3000, protocol=ecs.Protocol.TCP)
         )
+
+# ######################################################
+# Create security group....
 
         nodejs_security_group = ec2.SecurityGroup(
             self,
