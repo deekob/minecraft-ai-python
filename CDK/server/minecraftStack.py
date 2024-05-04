@@ -171,33 +171,35 @@ class MinecraftStack (Stack):
             description="IAM role for Node.js Fargate task execution"
         )
 
-        # Define the custom policy document allowing Bedrock runtime access
-        execution_policy_document = iam.PolicyDocument(
-            statements=[
-                iam.PolicyStatement(
-                    actions=[
-                        "ecr:GetAuthorizationToken",
-                        "ecr:BatchCheckLayerAvailability",
-                        "ecr:GetDownloadUrlForLayer",
-                        "ecr:BatchGetImage",
-                        "logs:CreateLogStream",
-                        "logs:PutLogEvents"
-                    ],
-                    resources=["*"],
-                    effect=iam.Effect.ALLOW
-                )
-            ]
-        )
+        nodejs_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonECSTaskExecutionRolePolicy"))
 
-        # Create an IAM policy using the custom policy document
-        execution_policy = iam.Policy(
-            self, "ExecutionPolicy",
-            policy_name="ECSExecutionRuntimeAccessPolicy",
-            document=execution_policy_document
-        )
+        # # Define the custom policy document allowing Bedrock runtime access
+        # execution_policy_document = iam.PolicyDocument(
+        #     statements=[
+        #         iam.PolicyStatement(
+        #             actions=[
+        #                 "ecr:GetAuthorizationToken",
+        #                 "ecr:BatchCheckLayerAvailability",
+        #                 "ecr:GetDownloadUrlForLayer",
+        #                 "ecr:BatchGetImage",
+        #                 "logs:CreateLogStream",
+        #                 "logs:PutLogEvents"
+        #             ],
+        #             resources=["*"],
+        #             effect=iam.Effect.ALLOW
+        #         )
+        #     ]
+        # )
 
-        # Attach the custom policy to the IAM role
-        nodejs_task_execution_role.attach_inline_policy(execution_policy)
+        # # Create an IAM policy using the custom policy document
+        # execution_policy = iam.Policy(
+        #     self, "ExecutionPolicy",
+        #     policy_name="ECSExecutionRuntimeAccessPolicy",
+        #     document=execution_policy_document
+        # )
+
+        # # Attach the custom policy to the IAM role
+        # nodejs_task_execution_role.attach_inline_policy(execution_policy)
 
 # ######################################################
 # Create Task...
@@ -208,7 +210,7 @@ class MinecraftStack (Stack):
             cpu=256,
             memory_limit_mib=512,
             task_role=nodejs_task_role,
-            execution_role=execution_policy
+            execution_role=nodejs_task_execution_role
         )
 
         health_check = ecs.HealthCheck(
