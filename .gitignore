@@ -164,5 +164,5 @@ node_modules
 
 .DS_Store
 tool_test.py
-
+rcon_test.py
 connect.txt

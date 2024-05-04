@@ -91,6 +91,7 @@ class MinecraftStack (Stack):
                 "MODE": "creative",
                 "DIFFICULTY": "peaceful",
                 "ONLINE_MODE": "FALSE",
+                "ALLOW_CHEATS": "TRUE",
             },
             secrets={
                 "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
