@@ -172,13 +172,12 @@ class MinecraftStack (Stack):
                 "sh",
                 "-c",
                 "echo 'Installing Node.js and Python packages...'",
-                "yum install -y nodejs python3",
+                "yum install -y nodejs python3 git",
                 "python3 -m ensurepip --upgrade",
-                "yum install git",
-                "pip3 install boto3 javascript",
                 "git clone https://github.com/deekob/minecraft-ai-python.git",
-                "echo 'More things here",
-                "echo 'Go!!' && tail -f /dev/null"
+                "pip3 install -r requirements.txt",
+                f"export MINECRAFT_NLB_DNS_NAME={minecraft_service.load_balancer.load_balancer_dns_name}", 
+                "python3 ./index.py" # && tail -f /dev/null"
             ],
         )
 
@@ -207,22 +206,6 @@ class MinecraftStack (Stack):
 
 
 # #######################################################
-
-        # # Output the AWS ECS execute-command command for the Node.js container
-        # nodejs_execute_command = f"aws ecs execute-command \\
-        #     --region {core.Aws.REGION} \\
-        #     --cluster {cluster.cluster_name} \\
-        #     --task <task-id> \\
-        #     --container {nodejs_container.container_name} \\
-        #     --command \"/bin/sh\" \\
-        #     --interactive"
-
-        # CfnOutput(
-        #     self,
-        #     "NodeJs Execute Command",
-        #     value=nodejs_execute_command,
-        #     description="Execute command for Node.js container"
-        # )
 
         CfnOutput(
             self,

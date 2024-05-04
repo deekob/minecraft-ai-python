@@ -16,6 +16,9 @@ import asyncio
 import uuid
 from javascript import require, On
 from bedrock_agent import BedrockBot
+import os
+
+minecraft_server_dns_name = os.environ['MINECRAFT_NLB_DNS_NAME']
 
 session_uuid_string = uuid.uuid4().hex
 
@@ -23,8 +26,8 @@ mineflayer = require('mineflayer')
 pathfinder = require('mineflayer-pathfinder')
 
 bot = mineflayer.createBot({
-  'host': 'localhost',
-  'port': 50781,
+  'host': minecraft_server_dns_name,
+  'port': 25565,
   'username':'Claude',
   'verbose': True,
   'checkTimeoutInterval': 60 * 10000,
