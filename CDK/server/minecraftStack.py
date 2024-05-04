@@ -11,6 +11,13 @@ class MinecraftStack (Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+
+        # The bot container...
+        my_repo_ecr = "590183852924.dkr.ecr.us-west-2.amazonaws.com"
+        my_repo_name = "minecraft-bot"
+        my_repo_tag = "0.1.2-1"
+
+
 # ######################################################
 # Create VPC and networking
 
@@ -133,7 +140,6 @@ class MinecraftStack (Stack):
         )
 
         # Define the custom policy document allowing Bedrock runtime access
-        ecr_repository_arn = "arn:aws:ecr:us-west-2:590183852924:repository/minecraft-bot"
         bedrock_policy_document = iam.PolicyDocument(
             statements=[
                 iam.PolicyStatement(
@@ -216,7 +222,7 @@ class MinecraftStack (Stack):
         nodejs_container = nodejs_task_definition.add_container(
             "nodejs-container",
             # image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
-            image=ecs.ContainerImage.from_registry("590183852924.dkr.ecr.us-west-2.amazonaws.com/minecraft-bot:0.1.2-1"),
+            image=ecs.ContainerImage.from_registry(f"{my_repo_ecr}/{my_repo_name}:{my_repo_tag}"),
             logging=ecs.LogDriver.aws_logs(stream_prefix="nodejs_container"),
             health_check=health_check,
             environment={
