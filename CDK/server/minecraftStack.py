@@ -171,7 +171,7 @@ class MinecraftStack (Stack):
             description="IAM role for Node.js Fargate task execution"
         )
 
-        nodejs_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonECSTaskExecutionRolePolicy"))
+        nodejs_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy"))
 
         # # Define the custom policy document allowing Bedrock runtime access
         # execution_policy_document = iam.PolicyDocument(
