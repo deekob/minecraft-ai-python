@@ -92,12 +92,13 @@ class FunctionHandler:
         z = float(parameters['location_z'])
         range_goal = 1
         self.bot.pathfinder.setGoal(self.pathfinder.goals.GoalNear(x, y, z, range_goal))
-        return {"message": "En route"}, "REPROMPT"
+        while self.bot.pathfinder.isMoving():
+            time.sleep(0.1)
+        return {"message": "movement complete"}, "REPROMPT"
     
     def action_get_distance_between_to_entities(self, parameters):
         self.logger.info("Getting the distance between to entities.")
         self.logger.info(parameters)     
-
 
         try:
             # get location from json string:
@@ -113,6 +114,51 @@ class FunctionHandler:
         self.logger.info(result)
         return {"distance": result}, "REPROMPT"
     
+    def action_collect_wood(self, parameters):
+        self.logger.info("Collecting wood.")
+        self.logger.info(parameters)
+
+        inventory_items = self.bot.inventory.items()
+
+        for item in inventory_items:
+            if '_axe' in item.name:
+                self.bot.equip(item, 'hand')
+                break
+
+        results = self.bot.findBlocks({
+            'point': self.bot.entity.position,
+            'maxDistance': 20,
+            'useExtraInfo': True,
+            'matching': [46,47,48,49,50,51,52,53,57,58,59,60,61,62,63,64], # All logs
+            'count': 5
+        })  
+
+        print(f"results: {results}")
+
+        log_count = 0
+
+        if results:
+            for result in results:
+                log_count = log_count + 1
+                block = self.bot.blockAt(result)
+                print(f"Found: {block.name}")
+                pos = result
+                print(f"{pos.x}, {pos.y}, {pos.z}")
+                
+                try:
+                    self.bot.pathfinder.goto(self.pathfinder.goals.GoalNear(pos.x, pos.y, pos.z, 1))
+                    while self.bot.pathfinder.isMoving():
+                        time.sleep(0.1)
+                    self.bot.collectBlock.collect(block)
+                    
+                except Exception as e:
+                    print(f"Handled exception: {e}")
+
+        else: 
+            return {"message": "No logs found."}, "REPROMPT"   
+
+        return {"message": f"Done. Collected {log_count} logs."}, "REPROMPT"
+
 
 
     def call_function(self, function_name, parameters):
@@ -127,8 +173,15 @@ class FunctionHandler:
         func = getattr(self, function_name, None)
         if func is None:
             self.logger.exception("Function not found.")
-            return {"error": "Function not found"}, "FAILURE"
-        return func(param_dict)
+            return {"error": "Function not found"}, "REPROMPT"
+        else:
+            try:
+                result, responseState = func(param_dict)
+                return result, responseState
+            except Exception as e:
+                self.logger.exception(e)
+                return {"error": "Something went wrong."}, "REPROMPT"
+        return {"error": "Function error"}, "FAILURE"
 
 class BedrockBot:
     def __init__(self, playerBot, pathfinder):

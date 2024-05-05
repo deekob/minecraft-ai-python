@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "mineflayer": "^4.19.0",
+    "mineflayer-collectblock": "^1.4.1",
     "start": "^5.1.0"
   },
   "name": "minecraft-ai-python",

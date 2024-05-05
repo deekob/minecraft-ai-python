@@ -11,11 +11,16 @@ class MinecraftStack (Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-
         # The bot container...
-        my_repo_ecr = "590183852924.dkr.ecr.us-west-2.amazonaws.com"
-        my_repo_name = "minecraft-bot"
-        my_repo_tag = "0.1.2-1"
+        repo_ecr = "590183852924.dkr.ecr.us-west-2.amazonaws.com"
+        repo_name = "minecraft-bot"
+        repo_tag = "0.1.2-1"
+
+        server_port = 25565
+        server_port_rcon = 25575
+        bot_username = "Claude"
+        agent_alias_id = "DCFT5Y8L8Z"
+        agent_id = "DEHCT5KPAE"
 
 
 # ######################################################
@@ -41,8 +46,8 @@ class MinecraftStack (Stack):
         # Add security group rules
         minecraft_security_group.add_ingress_rule(
             peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(25565),
-            description="Allow inbound TCP traffic on port 25565"
+            connection=ec2.Port.tcp(server_port),
+            description="Allow inbound TCP traffic on minecraft port"
         )
 
 # ######################################################
@@ -73,21 +78,21 @@ class MinecraftStack (Stack):
             logging=ecs.LogDriver.aws_logs(stream_prefix="minecraft"),
             port_mappings=[
                 ecs.PortMapping(
-                    container_port=25565,
-                    host_port=25565,
+                    container_port=server_port,
+                    host_port=server_port,
                     protocol=ecs.Protocol.TCP
                 ),
                 ecs.PortMapping(
-                    container_port=25575,
-                    host_port=25575,
+                    container_port=server_port_rcon,
+                    host_port=server_port_rcon,
                     protocol=ecs.Protocol.TCP
                 )
             ],
             environment={
                 "EULA": "TRUE",
                 "VERSION": "1.20.1",
-                "SERVER_PORT": "25565",
-                "RCON_PORT": "25575",
+                "SERVER_PORT": server_port,
+                "RCON_PORT": server_port_rcon,
                 "MODE": "creative",
                 "DIFFICULTY": "peaceful",
                 "ONLINE_MODE": "FALSE",
@@ -97,7 +102,7 @@ class MinecraftStack (Stack):
                 "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
             },
             health_check=ecs.HealthCheck(
-                command=["CMD-SHELL", "netstat -an | grep 25565 > /dev/null || exit 1"],
+                command=["CMD-SHELL", f"netstat -an | grep {server_port} > /dev/null || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
@@ -125,7 +130,7 @@ class MinecraftStack (Stack):
             task_definition=task_definition,
             desired_count=1,
             public_load_balancer=True,
-            listener_port=25565,
+            listener_port=server_port,
             assign_public_ip=False,
             health_check_grace_period=Duration.minutes(5),
             security_groups=[minecraft_security_group]  # Add this line to include your security group
@@ -174,34 +179,6 @@ class MinecraftStack (Stack):
 
         nodejs_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy"))
 
-        # # Define the custom policy document allowing Bedrock runtime access
-        # execution_policy_document = iam.PolicyDocument(
-        #     statements=[
-        #         iam.PolicyStatement(
-        #             actions=[
-        #                 "ecr:GetAuthorizationToken",
-        #                 "ecr:BatchCheckLayerAvailability",
-        #                 "ecr:GetDownloadUrlForLayer",
-        #                 "ecr:BatchGetImage",
-        #                 "logs:CreateLogStream",
-        #                 "logs:PutLogEvents"
-        #             ],
-        #             resources=["*"],
-        #             effect=iam.Effect.ALLOW
-        #         )
-        #     ]
-        # )
-
-        # # Create an IAM policy using the custom policy document
-        # execution_policy = iam.Policy(
-        #     self, "ExecutionPolicy",
-        #     policy_name="ECSExecutionRuntimeAccessPolicy",
-        #     document=execution_policy_document
-        # )
-
-        # # Attach the custom policy to the IAM role
-        # nodejs_task_execution_role.attach_inline_policy(execution_policy)
-
 # ######################################################
 # Create Task...
 
@@ -225,11 +202,15 @@ class MinecraftStack (Stack):
         nodejs_container = nodejs_task_definition.add_container(
             "nodejs-container",
             # image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
-            image=ecs.ContainerImage.from_registry(f"{my_repo_ecr}/{my_repo_name}:{my_repo_tag}"),
+            image=ecs.ContainerImage.from_registry(f"{repo_ecr}/{repo_name}:{repo_tag}"),
             logging=ecs.LogDriver.aws_logs(stream_prefix="nodejs_container"),
             health_check=health_check,
             environment={
-                "MINECRAFT_NLB_DNS_NAME": f"{minecraft_service.load_balancer.load_balancer_dns_name}"
+                "MINECRAFT_NLB_DNS_NAME": f"{minecraft_service.load_balancer.load_balancer_dns_name}",
+                "MINECRAFT_SERVER_PORT" : server_port,
+                "MINECRAFT_BOT_USERNAME" : bot_username,
+                "AGENT_ALIAS_ID" : agent_alias_id,
+                "AGENT_ID" : agent_id,
             }
         )
 
@@ -280,6 +261,6 @@ class MinecraftStack (Stack):
         CfnOutput(
             self,
             "MineCraft Service",
-            value=f"{minecraft_service.load_balancer.load_balancer_dns_name}:25565",
+            value=f"{minecraft_service.load_balancer.load_balancer_dns_name}:{server_port}",
             description="Access minecraft from your client"
         )

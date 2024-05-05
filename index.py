@@ -19,26 +19,38 @@ from bedrock_agent import BedrockBot
 import os
 
 minecraft_server_dns_name = os.environ['MINECRAFT_NLB_DNS_NAME']
+minecraft_server_port = os.environ['MINECRAFT_SERVER_PORT']
+minecraft_bot_username = os.environ['MINECRAFT_BOT_USERNAME']
+agent_alias_id = os.environ['AGENT_ALIAS_ID']
+agent_id = os.environ['AGENT_ID']
+
+# minecraft_server_dns_name = 'localhost'
+# minecraft_server_port = 25565
+# minecraft_bot_username = "Claude"
+# agent_alias_id = 'DCFT5Y8L8Z'
+# agent_id = 'DEHCT5KPAE'
 
 session_uuid_string = uuid.uuid4().hex
 
 mineflayer = require('mineflayer')
 pathfinder = require('mineflayer-pathfinder')
+collectblock = require('mineflayer-collectblock')
 
 bot = mineflayer.createBot({
   'host': minecraft_server_dns_name,
-  'port': 25565,
-  'username':'Claude',
+  'port': minecraft_server_port,
+  'username':minecraft_bot_username,
   'verbose': True,
   'checkTimeoutInterval': 60 * 10000,
 })
 
 bot.loadPlugin(pathfinder.pathfinder)
+bot.loadPlugin(collectblock.plugin)
 mcData = require('minecraft-data')(bot.version)
 
 bedrockAgent = BedrockBot(bot, pathfinder)
-bedrockAgent.agentAliasId = 'ZRBDM9FIBL' # testClaude
-bedrockAgent.agentId = 'DEHCT5KPAE'
+bedrockAgent.agentAliasId = agent_alias_id
+bedrockAgent.agentId = agent_id
 bedrockAgent.session_id = session_uuid_string
 
 @On(bot, 'spawn')
