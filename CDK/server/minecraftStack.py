@@ -5,6 +5,8 @@ import aws_cdk.aws_ecs_patterns as ecs_patterns
 import aws_cdk.aws_secretsmanager as secretsmanager
 from constructs import Construct
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_elasticloadbalancingv2 as elbv2
+
 
 #create a python CDK stack that extends cdk.Stack
 class MinecraftStack (Stack):
@@ -48,6 +50,13 @@ class MinecraftStack (Stack):
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(server_port),
             description="Allow inbound TCP traffic on minecraft port"
+        )
+
+        # Add security group rules
+        minecraft_security_group.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(server_port_rcon),
+            description="Allow inbound TCP traffic on minecraft rcon"
         )
 
 # ######################################################
@@ -97,6 +106,8 @@ class MinecraftStack (Stack):
                 "DIFFICULTY": "peaceful",
                 "ONLINE_MODE": "FALSE",
                 "ALLOW_CHEATS": "TRUE",
+                "LEVEL_TYPE": "FLAT",
+                "ALLOW_FLIGHT": "TRUE",
             },
             secrets={
                 "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
@@ -240,6 +251,121 @@ class MinecraftStack (Stack):
             enable_execute_command=True
         )
 
+#####################################################################
+#####################################################################
+# ######################################################
+# Create an IAM role for the rcon container
+
+        rcon_task_role = iam.Role(
+            self, "RconTaskRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+            description="IAM role for rcon Fargate task"
+        )
+
+        # Define the custom policy document allowing Bedrock runtime access
+        rcon_policy_document = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    actions=[
+                        "bedrock:Invoke*"
+                    ],
+                    resources=["*"],  # Adjust the resource ARN as needed
+                    effect=iam.Effect.ALLOW
+                )
+            ]
+        )
+
+        # Create an IAM policy using the custom policy document
+        rcon_policy = iam.Policy(
+            self, "RconPolicy",
+            policy_name="RconPolicy",
+            document=rcon_policy_document
+        )
+
+        # Attach the custom policy to the IAM role
+        rcon_task_role.attach_inline_policy(rcon_policy)
+
+# ######################################################
+# Create Amazon ECS task execution IAM role
+
+        rcon_task_execution_role = iam.Role(
+            self, "RconTaskExecutionRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+            description="IAM role for rcon Fargate task execution"
+        )
+
+        rcon_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy"))
+
+# ######################################################
+# Create Task...
+
+        # Update the rcon task definition to use the IAM role
+        rcon_task_definition = ecs.FargateTaskDefinition(
+            self, "RconTaskDefinition",
+            cpu=256,
+            memory_limit_mib=512,
+            task_role=rcon_task_role,
+            execution_role=rcon_task_execution_role
+        )
+
+        rcon_health_check = ecs.HealthCheck(
+            interval=Duration.minutes(1),
+            timeout=Duration.seconds(30),
+            retries=3,
+            start_period=Duration.minutes(1),
+            command=["CMD-SHELL", "echo 'foo' || exit 0"]
+        )
+
+        rcon_container = rcon_task_definition.add_container(
+            "rcon-container",
+            image=ecs.ContainerImage.from_registry("amazonlinux:latest"),
+            logging=ecs.LogDriver.aws_logs(stream_prefix="rcon"),
+            health_check=rcon_health_check,
+            environment={
+                "MINECRAFT_NLB_DNS_NAME": f"{minecraft_service.load_balancer.load_balancer_dns_name}",
+                "MINECRAFT_SERVER_PORT" : str(server_port),
+                "MINECRAFT_SERVER_PORT_RCON" : str(server_port_rcon),
+                "MINECRAFT_BOT_USERNAME" : bot_username,
+                "AGENT_ALIAS_ID" : agent_alias_id,
+                "AGENT_ID" : agent_id,
+            },
+            secrets={
+                "RCON_PASSWORD": ecs.Secret.from_secrets_manager(rcon_secret)
+            },
+            command=[
+                "sh",
+                "-c",
+                "tail -f /dev/null"
+            ]
+        )
+
+        rcon_container.add_port_mappings(
+            ecs.PortMapping(container_port=3000, host_port=3000, protocol=ecs.Protocol.TCP)
+        )
+
+# ######################################################
+# Create security group....
+
+        rcon_security_group = ec2.SecurityGroup(
+            self,
+            "RconSecurityGroup",
+            vpc=minecraft_vpc,
+            description="Security group for Rcon service",
+            allow_all_outbound=True
+        )
+
+        # Create the rcon service without a load balancer and with the new security group
+        rcon_service = ecs.FargateService(
+            self, "RconService",
+            cluster=cluster,
+            task_definition=rcon_task_definition,
+            desired_count=1,
+            security_groups=[rcon_security_group],  # Use the dedicated security group
+            assign_public_ip=False,
+            enable_execute_command=True
+        )
+
+
 
 # #######################################################
 
@@ -250,11 +376,26 @@ class MinecraftStack (Stack):
     --interactive \
     --command "/bin/sh"
 """
+        
+        rcon_connection_link = f"""aws ecs execute-command \
+    --cluster {cluster.cluster_name} \
+    --task {rcon_service.task_definition.task_definition_arn}/XXXXXXXXXXX \
+    --container rcon-container \
+    --interactive \
+    --command "/bin/sh"
+"""
 
         CfnOutput(
             self,
             "Server Connection",
             value=f"{server_connection_link}",
+            description="Connect to the node container"
+        )
+
+        CfnOutput(
+            self,
+            "Rcon Connection",
+            value=f"{rcon_connection_link}",
             description="Connect to the node container"
         )
 
