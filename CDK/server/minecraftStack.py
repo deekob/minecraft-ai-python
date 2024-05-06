@@ -207,7 +207,7 @@ class MinecraftStack (Stack):
             health_check=health_check,
             environment={
                 "MINECRAFT_NLB_DNS_NAME": f"{minecraft_service.load_balancer.load_balancer_dns_name}",
-                "MINECRAFT_SERVER_PORT" : server_port,
+                "MINECRAFT_SERVER_PORT" : str(server_port),
                 "MINECRAFT_BOT_USERNAME" : bot_username,
                 "AGENT_ALIAS_ID" : agent_alias_id,
                 "AGENT_ID" : agent_id,
