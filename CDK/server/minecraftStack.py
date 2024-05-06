@@ -271,6 +271,14 @@ class MinecraftStack (Stack):
                     ],
                     resources=["*"],  # Adjust the resource ARN as needed
                     effect=iam.Effect.ALLOW
+                ),
+                # add managed policy for ecs access
+                iam.PolicyStatement(
+                    actions=[
+                        "ecs:*"
+                    ],
+                    resources=["*"],  # Adjust the resource ARN as needed
+                    effect=iam.Effect.ALLOW
                 )
             ]
         )
@@ -295,6 +303,7 @@ class MinecraftStack (Stack):
         )
 
         rcon_task_execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy"))
+
 
 # ######################################################
 # Create Task...
