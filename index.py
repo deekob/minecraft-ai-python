@@ -34,7 +34,7 @@ session_uuid_string = uuid.uuid4().hex
 
 mineflayer = require('mineflayer')
 pathfinder = require('mineflayer-pathfinder')
-collectblock = require('mineflayer-collectblock')
+# collectblock = require('mineflayer-collectblock')
 
 bot = mineflayer.createBot({
   'host': minecraft_server_dns_name,
@@ -45,7 +45,7 @@ bot = mineflayer.createBot({
 })
 
 bot.loadPlugin(pathfinder.pathfinder)
-bot.loadPlugin(collectblock.plugin)
+# bot.loadPlugin(collectblock.plugin)
 mcData = require('minecraft-data')(bot.version)
 
 bedrockAgent = BedrockBot(bot, pathfinder)

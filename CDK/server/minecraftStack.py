@@ -14,7 +14,7 @@ class MinecraftStack (Stack):
         # The bot container...
         repo_ecr = "590183852924.dkr.ecr.us-west-2.amazonaws.com"
         repo_name = "minecraft-bot"
-        repo_tag = "0.1.2-1"
+        repo_tag = "0.1.5-1"
 
         server_port = 25565
         server_port_rcon = 25575
@@ -91,8 +91,8 @@ class MinecraftStack (Stack):
             environment={
                 "EULA": "TRUE",
                 "VERSION": "1.20.1",
-                "SERVER_PORT": server_port,
-                "RCON_PORT": server_port_rcon,
+                "SERVER_PORT": str(server_port),
+                "RCON_PORT": str(server_port_rcon),
                 "MODE": "creative",
                 "DIFFICULTY": "peaceful",
                 "ONLINE_MODE": "FALSE",
