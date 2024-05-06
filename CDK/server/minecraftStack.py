@@ -14,7 +14,7 @@ class MinecraftStack (Stack):
         # The bot container...
         repo_ecr = "590183852924.dkr.ecr.us-west-2.amazonaws.com"
         repo_name = "minecraft-bot"
-        repo_tag = "0.1.5-1"
+        repo_tag = "0.1.4-3"
 
         server_port = 25565
         server_port_rcon = 25575
